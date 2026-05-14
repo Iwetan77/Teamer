@@ -24,7 +24,10 @@ export default function InvitePage() {
   }, [token])
 
   async function acceptInvite() {
-    if (!user) return signInWithGoogle()
+    if (!user) {
+      sessionStorage.setItem('pending_invite_token', token)
+      return signInWithGoogle()
+    }
     setStatus('accepting')
     const { data, error } = await supabase.rpc('accept_invitation', { p_token: token })
     if (error || data?.error) {

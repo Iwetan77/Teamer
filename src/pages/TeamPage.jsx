@@ -1,18 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useOrg } from '../context/OrgContext'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 import { Avatar } from '../components/ui/Avatar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { getSkill } from '../lib/utils'
-import { UserPlus, Shield, Trash2, Clock, Mail } from 'lucide-react'
+import { UserPlus, Shield, Trash2, Clock, Copy, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
 export default function TeamPage() {
-  const { currentOrg, members, isAdmin, inviteMember, shareOwnership, removeMember, myRole } = useOrg()
+  const { currentOrg, members, isAdmin, inviteMember, shareOwnership, removeMember, myRole, refetchMembers } = useOrg()
   const { user } = useAuth()
   const [inviteEmail, setInviteEmail] = useState('')
   const [loading, setLoading] = useState(false)
+  const [copiedId, setCopiedId] = useState(null)
+
+  useEffect(() => {
+    if (!currentOrg) return
+    const channel = supabase.channel(`org-members:${currentOrg.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'org_members', filter: `org_id=eq.${currentOrg.id}` }, () => {
+        refetchMembers()
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [currentOrg])
 
   async function handleInvite() {
     if (!inviteEmail.trim()) return
@@ -23,14 +35,31 @@ export default function TeamPage() {
     setLoading(false)
     if (error) {
       if (error.code === '23505') return toast.error('This person is already in your workspace.')
-      return toast.error(error.message || 'Failed to send invite')
+      return toast.error(error.message || 'Failed to create invite')
     }
-    if (!userExists) {
-      toast(`${inviteEmail} isn't on Teamer yet. Invite sent — they'll get an email to join!`, { icon: '📧', duration: 5000 })
+    const inviteLink = `${window.location.origin}/invite?token=${data.invite_token}`
+    await copyToClipboard(inviteLink)
+    if (userExists) {
+      toast.success(`${inviteEmail} has been invited!`)
     } else {
-      toast.success(`Invite sent to ${inviteEmail}!`)
+      toast(`Invite link copied! Share it with ${inviteEmail} to join.`, { icon: '🔗', duration: 6000 })
     }
     setInviteEmail('')
+  }
+
+  async function copyToClipboard(text, id) {
+    try {
+      await navigator.clipboard.writeText(text)
+      if (id) { setCopiedId(id); setTimeout(() => setCopiedId(null), 2000) }
+      return true
+    } catch {
+      toast.error('Could not copy — try manually.')
+      return false
+    }
+  }
+
+  function getInviteLink(token) {
+    return `${window.location.origin}/invite?token=${token}`
   }
 
   async function handleShareOwnership(memberId) {
@@ -76,7 +105,7 @@ export default function TeamPage() {
             </button>
           </div>
           <p className="text-xs mt-2" style={{ color: 'var(--text-3)' }}>
-            If they're not on Teamer yet, they'll receive an email invite with a link to join.
+            An invite link will be copied to your clipboard — share it via email, WhatsApp, Slack, or wherever.
           </p>
         </div>
       )}
@@ -92,7 +121,7 @@ export default function TeamPage() {
           </div>
         ) : (
           <div>
-            {active.map((m, i) => {
+            {active.map(m => {
               const skill = getSkill(m.profiles?.skill)
               const isMe = m.user_id === user?.id
               return (
@@ -140,16 +169,30 @@ export default function TeamPage() {
           </div>
           {invited.map(m => (
             <div key={m.id} className="flex items-center gap-3 px-5 py-3 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: 'var(--surface-2)' }}>
-                <Mail size={16} style={{ color: 'var(--text-3)' }} />
+              <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--surface-2)' }}>
+                <UserPlus size={16} style={{ color: 'var(--text-3)' }} />
               </div>
-              <div className="flex-1">
-                <p className="text-sm">{m.email}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm truncate">{m.email}</p>
                 <p className="text-xs" style={{ color: 'var(--text-3)' }}>Invited {format(new Date(m.created_at), 'MMM d, yyyy')}</p>
               </div>
-              <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>
-                <Clock size={10} /> Pending
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>
+                  <Clock size={10} /> Pending
+                </span>
+                {isAdmin && m.invite_token && (
+                  <button
+                    className="btn-ghost p-1.5"
+                    title="Copy invite link"
+                    onClick={() => {
+                      copyToClipboard(getInviteLink(m.invite_token), m.id)
+                      toast.success('Invite link copied!')
+                    }}
+                  >
+                    {copiedId === m.id ? <Check size={15} style={{ color: '#22c55e' }} /> : <Copy size={15} />}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

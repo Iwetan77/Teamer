@@ -109,13 +109,26 @@ export function OrgProvider({ children }) {
     await fetchMembers(currentOrg.id)
   }
 
+  async function deleteOrg() {
+    if (!currentOrg) return { error: 'No org selected' }
+    const { error } = await supabase.from('organizations').delete().eq('id', currentOrg.id)
+    if (error) return { error }
+    setCurrentOrg(null)
+    setOrgs([])
+    setMembers([])
+    localStorage.removeItem('teamer-last-org')
+    await fetchOrgs()
+    return {}
+  }
+
   const isAdmin = myRole === 'owner' || myRole === 'admin'
 
   return (
-    <OrgContext.Provider value={{ orgs, currentOrg, setCurrentOrg, members, loading, myRole, isAdmin, createOrg, inviteMember, shareOwnership, removeMember, refetch: fetchOrgs, refetchMembers: () => fetchMembers(currentOrg?.id) }}>
+    <OrgContext.Provider value={{ orgs, currentOrg, setCurrentOrg, members, loading, myRole, isAdmin, createOrg, inviteMember, shareOwnership, removeMember, deleteOrg, refetch: fetchOrgs, refetchMembers: () => fetchMembers(currentOrg?.id) }}>
       {children}
     </OrgContext.Provider>
   )
 }
+
 
 export const useOrg = () => useContext(OrgContext)

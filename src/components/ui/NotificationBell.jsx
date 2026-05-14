@@ -16,13 +16,13 @@ export function NotificationBell() {
     if (!user) return
     fetchNotifications()
 
-    const sub = supabase.channel('notifications')
+    const channel = supabase.channel(`notifications:${user.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, payload => {
         setNotifications(prev => [payload.new, ...prev].slice(0, 30))
       })
       .subscribe()
 
-    return () => sub.unsubscribe()
+    return () => supabase.removeChannel(channel)
   }, [user])
 
   useEffect(() => {

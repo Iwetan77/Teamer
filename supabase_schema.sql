@@ -159,33 +159,40 @@ CREATE POLICY "Owners can delete org"
   ON organizations FOR DELETE USING (owner_id = auth.uid());
 
 -- Org Members
+-- Helper functions bypass RLS to avoid self-referential recursion
+CREATE OR REPLACE FUNCTION is_org_member(p_org_id UUID)
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM org_members
+    WHERE org_id = p_org_id AND user_id = auth.uid() AND status = 'active'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION is_org_admin(p_org_id UUID)
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM org_members
+    WHERE org_id = p_org_id AND user_id = auth.uid()
+      AND role IN ('owner', 'admin') AND status = 'active'
+  );
+$$;
+
 CREATE POLICY "Members can view org membership"
   ON org_members FOR SELECT USING (
-    org_id IN (
-      SELECT org_id FROM org_members om2
-      WHERE om2.user_id = auth.uid() AND om2.status = 'active'
-    ) OR user_id = auth.uid()
+    is_org_member(org_id) OR user_id = auth.uid()
   );
 
 CREATE POLICY "Admins/owners can manage members"
-  ON org_members FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM org_members om
-      WHERE om.org_id = org_members.org_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
-    )
-  );
+  ON org_members FOR ALL USING (is_org_admin(org_id));
 
-CREATE POLICY "Insert new member invites"
+CREATE POLICY "Insert org member"
   ON org_members FOR INSERT WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM org_members om
-      WHERE om.org_id = org_members.org_id
-        AND om.user_id = auth.uid()
-        AND om.role IN ('owner', 'admin')
-        AND om.status = 'active'
+    is_org_admin(org_id)
+    OR (
+      user_id = auth.uid()
+      AND EXISTS (
+        SELECT 1 FROM organizations WHERE id = org_id AND owner_id = auth.uid()
+      )
     )
   );
 
@@ -298,7 +305,7 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', NEW.email),
     NEW.raw_user_meta_data->>'avatar_url'
   )
   ON CONFLICT (id) DO NOTHING;
@@ -346,3 +353,4 @@ ALTER PUBLICATION supabase_realtime ADD TABLE tasks;
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE task_comments;
 ALTER PUBLICATION supabase_realtime ADD TABLE announcements;
+ALTER PUBLICATION supabase_realtime ADD TABLE org_members;

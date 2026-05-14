@@ -1,23 +1,22 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate()
+  const { user, loading } = useAuth()
 
   useEffect(() => {
-    // Supabase v2 PKCE: code exchange is async — listen for SIGNED_IN rather than
-    // calling getSession() immediately (which returns null before exchange completes).
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+    if (!loading && user) {
+      const pendingToken = sessionStorage.getItem('pending_invite_token')
+      if (pendingToken) {
+        sessionStorage.removeItem('pending_invite_token')
+        navigate(`/invite?token=${pendingToken}`, { replace: true })
+      } else {
         navigate('/dashboard', { replace: true })
-      } else if (event === 'SIGNED_OUT') {
-        navigate('/', { replace: true })
       }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [navigate])
+    }
+  }, [user, loading, navigate])
 
   return (
     <div className="min-h-screen flex items-center justify-center">

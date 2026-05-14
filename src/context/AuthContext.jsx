@@ -11,13 +11,13 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
+      setLoading(false)
       if (session?.user) fetchProfile(session.user.id)
-      else setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) await fetchProfile(session.user.id)
+      if (session?.user) fetchProfile(session.user.id)
       else { setProfile(null); setLoading(false) }
     })
 
@@ -30,8 +30,26 @@ export function AuthProvider({ children }) {
       .select('*')
       .eq('id', userId)
       .single()
-    setProfile(data)
-    setLoading(false)
+
+    if (data) {
+      setProfile(data)
+      return
+    }
+
+    // Profile missing (trigger race on first sign-in) — create it from OAuth metadata
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    const meta = authUser?.user_metadata ?? {}
+    const { data: created } = await supabase
+      .from('profiles')
+      .upsert({
+        id: userId,
+        email: authUser.email,
+        full_name: meta.full_name || meta.name || authUser.email,
+        avatar_url: meta.avatar_url || meta.picture || null,
+      })
+      .select()
+      .single()
+    setProfile(created)
   }
 
   async function signInWithGoogle() {

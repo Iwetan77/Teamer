@@ -1,27 +1,42 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useOrg } from '../context/OrgContext'
 import { supabase } from '../lib/supabase'
 import { EmptyState } from '../components/ui/EmptyState'
-import { Save } from 'lucide-react'
+import { Save, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function SettingsPage() {
-  const { currentOrg, isAdmin, refetch } = useOrg()
+  const { currentOrg, isAdmin, myRole, refetch, deleteOrg } = useOrg()
+  const navigate = useNavigate()
   const [name, setName] = useState(currentOrg?.name || '')
   const [description, setDescription] = useState(currentOrg?.description || '')
   const [loading, setLoading] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   if (!currentOrg || !isAdmin) return (
     <EmptyState icon="⚙️" title="No access" description="You need admin access to view settings." />
   )
 
   async function handleSave() {
+    if (!name.trim()) return toast.error('Workspace name is required')
     setLoading(true)
-    const { error } = await supabase.from('organizations').update({ name, description }).eq('id', currentOrg.id)
+    const { error } = await supabase.from('organizations').update({ name: name.trim(), description: description.trim() }).eq('id', currentOrg.id)
     setLoading(false)
     if (error) return toast.error('Failed to save')
     await refetch()
     toast.success('Settings saved!')
+  }
+
+  async function handleDelete() {
+    if (deleteConfirm !== currentOrg.name) return toast.error('Workspace name does not match')
+    setDeleting(true)
+    const { error } = await deleteOrg()
+    setDeleting(false)
+    if (error) return toast.error('Failed to delete workspace')
+    toast.success('Workspace deleted')
+    navigate('/dashboard')
   }
 
   return (
@@ -46,13 +61,32 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      <div className="card p-5" style={{ borderColor: '#fca5a5' }}>
-        <h2 className="section-title text-sm mb-1 text-red-600">Danger zone</h2>
-        <p className="text-xs mb-3" style={{ color: 'var(--text-2)' }}>These actions are irreversible. Be careful.</p>
-        <button className="btn-outline text-red-500 border-red-200" onClick={() => toast.error('Contact support to delete a workspace.')}>
-          Delete workspace
-        </button>
-      </div>
+      {myRole === 'owner' && (
+        <div className="card p-5 space-y-3" style={{ borderColor: '#fca5a5' }}>
+          <h2 className="section-title text-sm text-red-600">Danger zone</h2>
+          <p className="text-xs" style={{ color: 'var(--text-2)' }}>
+            Deleting <strong>{currentOrg.name}</strong> will permanently remove all tasks, announcements, and member data. This cannot be undone.
+          </p>
+          <div>
+            <label className="label block mb-1.5">Type <strong>{currentOrg.name}</strong> to confirm</label>
+            <input
+              value={deleteConfirm}
+              onChange={e => setDeleteConfirm(e.target.value)}
+              placeholder={currentOrg.name}
+              style={{ borderColor: deleteConfirm && deleteConfirm !== currentOrg.name ? '#f87171' : undefined }}
+            />
+          </div>
+          <button
+            className="btn-outline flex items-center gap-2"
+            style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+            onClick={handleDelete}
+            disabled={deleting || deleteConfirm !== currentOrg.name}
+          >
+            <Trash2 size={15} />
+            {deleting ? 'Deleting...' : 'Delete workspace'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

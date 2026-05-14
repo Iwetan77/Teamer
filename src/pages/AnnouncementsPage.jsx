@@ -19,7 +19,16 @@ export default function AnnouncementsPage() {
   const [pinned, setPinned] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => { if (currentOrg) fetchAnnouncements() }, [currentOrg])
+  useEffect(() => {
+    if (!currentOrg) return
+    fetchAnnouncements()
+    const channel = supabase.channel(`announcements:${currentOrg.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements', filter: `org_id=eq.${currentOrg.id}` }, () => {
+        fetchAnnouncements()
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [currentOrg])
 
   async function fetchAnnouncements() {
     const { data } = await supabase
