@@ -55,12 +55,24 @@ export function AuthProvider({ children }) {
   }
 
   async function checkPendingInvites(email) {
+    const { data: { user: authUser } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('org_members')
-      .select('id, invite_token, org_id, invited_by, organizations(name), inviter:profiles!invited_by(full_name, avatar_url)')
+      .select('id, invite_token, org_id, invited_by, user_id, organizations(name), inviter:profiles!invited_by(full_name, avatar_url)')
       .eq('email', email)
       .eq('status', 'invited')
-    setPendingInvites(data || [])
+    if (data) {
+      // Self-heal: link user_id on any invite row that's missing it
+      const unlinked = data.filter(r => !r.user_id && authUser?.id)
+      if (unlinked.length > 0) {
+        await supabase.from('org_members')
+          .update({ user_id: authUser.id })
+          .in('id', unlinked.map(r => r.id))
+      }
+      setPendingInvites(data)
+    } else {
+      setPendingInvites([])
+    }
   }
 
   async function acceptInvite(token) {
