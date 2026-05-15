@@ -70,14 +70,14 @@ export default function DashboardPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total tasks', value: stats.total, bg: 'var(--surface-2)' },
-          { label: 'In progress', value: stats.inProgress, bg: '#eff6ff' },
-          { label: 'Submitted', value: stats.submitted, bg: '#f5f3ff' },
-          { label: 'Approved', value: stats.approved, bg: '#f0fdf4' },
+          { label: 'Total tasks', value: stats.total, accent: 'var(--text-2)' },
+          { label: 'In progress', value: stats.inProgress, accent: '#3b82f6' },
+          { label: 'Submitted', value: stats.submitted, accent: '#8b5cf6' },
+          { label: 'Approved', value: stats.approved, accent: '#22c55e' },
         ].map((s, i) => (
-          <div key={i} className="card p-4" style={{ background: s.bg }}>
+          <div key={i} className="card p-4" style={{ borderLeft: `3px solid ${s.accent}` }}>
             <p className="label mb-1">{s.label}</p>
-            <p className="text-2xl font-semibold" style={{ fontFamily: 'Syne, sans-serif' }}>{s.value}</p>
+            <p className="text-2xl font-semibold" style={{ fontFamily: 'Syne, sans-serif', color: s.accent }}>{s.value}</p>
           </div>
         ))}
       </div>

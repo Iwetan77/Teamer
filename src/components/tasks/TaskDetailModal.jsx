@@ -251,7 +251,7 @@ export function TaskDetailModal({ task, open, onClose, onUpdate }) {
               <label className="btn-outline text-xs cursor-pointer inline-flex items-center gap-1.5">
                 <Upload size={14} />
                 {uploading ? 'Uploading...' : 'Upload file'}
-                <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+                <input type="file" accept="*/*" className="hidden" onChange={handleFileUpload} disabled={uploading} />
               </label>
             )}
 
