@@ -28,7 +28,7 @@ export default function DashboardPage() {
   async function fetchData() {
     setLoading(true)
     const [tasksRes, announcementsRes] = await Promise.all([
-      supabase.from('tasks').select('*, profiles(full_name, avatar_url, skill)').eq('org_id', currentOrg.id).order('created_at', { ascending: false }).limit(6),
+      supabase.from('tasks').select('*, profiles!tasks_assigned_to_fkey(full_name, avatar_url, skill)').eq('org_id', currentOrg.id).order('created_at', { ascending: false }).limit(6),
       supabase.from('announcements').select('*, profiles(full_name, avatar_url)').eq('org_id', currentOrg.id).order('created_at', { ascending: false }).limit(5),
     ])
     if (tasksRes.data) setTasks(tasksRes.data)
