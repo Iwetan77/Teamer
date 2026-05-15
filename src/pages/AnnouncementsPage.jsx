@@ -10,8 +10,8 @@ import toast from 'react-hot-toast'
 import { format, formatDistanceToNow } from 'date-fns'
 
 export default function AnnouncementsPage() {
-  const { user } = useAuth()
-  const { currentOrg, isAdmin } = useOrg()
+  const { user, profile } = useAuth()
+  const { currentOrg, isAdmin, members } = useOrg()
   const [announcements, setAnnouncements] = useState([])
   const [createOpen, setCreateOpen] = useState(false)
   const [title, setTitle] = useState('')
@@ -52,6 +52,20 @@ export default function AnnouncementsPage() {
     })
     setLoading(false)
     if (error) return toast.error('Failed to post')
+
+    // Notify all active members except the poster
+    const targets = members.filter(m => m.status === 'active' && m.user_id && m.user_id !== user.id)
+    if (targets.length > 0) {
+      await supabase.from('notifications').insert(
+        targets.map(m => ({
+          user_id: m.user_id,
+          type: 'announcement',
+          title: `📢 ${title.trim()}`,
+          body: body.trim().slice(0, 120),
+        }))
+      )
+    }
+
     toast.success('Announcement posted!')
     setTitle(''); setBody(''); setPinned(false)
     setCreateOpen(false)

@@ -36,7 +36,7 @@ export default function TasksPage() {
     setLoading(true)
     const { data } = await supabase
       .from('tasks')
-      .select('*, profiles!tasks_assigned_to_fkey(full_name, avatar_url, skill)')
+      .select('*, task_skill, profiles!tasks_assigned_to_fkey(full_name, avatar_url, skill)')
       .eq('org_id', currentOrg.id)
       .order('created_at', { ascending: false })
     if (data) {

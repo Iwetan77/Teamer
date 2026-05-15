@@ -25,7 +25,7 @@ export function TaskDetailModal({ task, open, onClose, onUpdate }) {
   const isAssignee = task?.assigned_to === user?.id
   const canSubmit = isAssignee && ['assigned', 'in_progress', 'rejected'].includes(task?.status)
   const canReview = isAdmin && task?.status === 'submitted'
-  const subType = submissionTypeForSkill(task?.profiles?.skill)
+  const subType = submissionTypeForSkill(task?.task_skill || task?.profiles?.skill)
 
   useEffect(() => {
     if (!open || !task) return

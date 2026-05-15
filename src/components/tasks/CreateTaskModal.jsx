@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useOrg } from '../../context/OrgContext'
-import { getWeekNumber } from '../../lib/utils'
+import { getWeekNumber, SKILLS } from '../../lib/utils'
 import toast from 'react-hot-toast'
 
 export function CreateTaskModal({ open, onClose, onCreated }) {
@@ -14,6 +14,7 @@ export function CreateTaskModal({ open, onClose, onCreated }) {
   const [assignedTo, setAssignedTo] = useState('')
   const [priority, setPriority] = useState('medium')
   const [deadline, setDeadline] = useState('')
+  const [taskSkill, setTaskSkill] = useState('')
   const [loading, setLoading] = useState(false)
 
   const activeMembers = members.filter(m => m.status === 'active' && m.user_id)
@@ -31,6 +32,7 @@ export function CreateTaskModal({ open, onClose, onCreated }) {
       assigned_to: assignedTo,
       assigned_by: user.id,
       priority,
+      task_skill: taskSkill || null,
       deadline: deadline ? new Date(deadline).toISOString() : null,
       week_number: week,
       week_year: year,
@@ -52,7 +54,7 @@ export function CreateTaskModal({ open, onClose, onCreated }) {
       })
     }
 
-    setTitle(''); setDescription(''); setAssignedTo(''); setPriority('medium'); setDeadline('')
+    setTitle(''); setDescription(''); setAssignedTo(''); setPriority('medium'); setDeadline(''); setTaskSkill('')
     onCreated()
     onClose()
   }
@@ -90,6 +92,16 @@ export function CreateTaskModal({ open, onClose, onCreated }) {
               <option value="urgent">Urgent</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className="label block mb-1.5">Task type <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(sets submission format)</span></label>
+          <select value={taskSkill} onChange={e => setTaskSkill(e.target.value)}>
+            <option value="">Auto — use assignee's role</option>
+            {SKILLS.map(s => (
+              <option key={s.value} value={s.value}>{s.icon} {s.label}</option>
+            ))}
+          </select>
         </div>
 
         <div>

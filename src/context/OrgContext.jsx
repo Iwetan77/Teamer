@@ -120,6 +120,28 @@ export function OrgProvider({ children }) {
     if (existingMember?.status === 'invited') {
       return { data: existingMember, userExists: false, resent: true }
     }
+    if (existingMember?.status === 'removed') {
+      // Previously declined or removed — re-invite them
+      const { data: updated, error } = await supabase
+        .from('org_members')
+        .update({ status: 'invited', invited_by: user.id, user_id: null })
+        .eq('id', existingMember.id)
+        .select()
+        .single()
+      if (error) return { error }
+      const { data: existingProfile } = await supabase.from('profiles').select('id').eq('email', email).single()
+      if (existingProfile?.id) {
+        await supabase.from('notifications').insert({
+          user_id: existingProfile.id,
+          type: 'workspace_invite',
+          title: `You've been invited to ${currentOrg.name}`,
+          body: `Accept the invite to join ${currentOrg.name} on Teamer.`,
+          link: `/invite?token=${updated.invite_token}`,
+        })
+      }
+      await fetchMembers(currentOrg.id)
+      return { data: updated, userExists: !!existingProfile }
+    }
 
     const { data: existingProfile } = await supabase
       .from('profiles')
@@ -163,6 +185,11 @@ export function OrgProvider({ children }) {
     await fetchMembers(currentOrg.id)
   }
 
+  async function updateMemberSkill(profileId, skill) {
+    await supabase.from('profiles').update({ skill }).eq('id', profileId)
+    await fetchMembers(currentOrg.id)
+  }
+
   async function deleteOrg() {
     if (!currentOrg) return { error: 'No org selected' }
     const { error } = await supabase.from('organizations').delete().eq('id', currentOrg.id)
@@ -183,7 +210,7 @@ export function OrgProvider({ children }) {
       createOrg, inviteMember, shareOwnership, removeMember, deleteOrg,
       refetch: (selectOrgId) => fetchOrgs(selectOrgId),
       refetchMembers: () => currentOrg && fetchMembers(currentOrg.id),
-      revokeInvite,
+      revokeInvite, updateMemberSkill,
     }}>
       {children}
     </OrgContext.Provider>

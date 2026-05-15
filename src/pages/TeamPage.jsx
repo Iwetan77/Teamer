@@ -3,17 +3,18 @@ import { useOrg } from '../context/OrgContext'
 import { useAuth } from '../context/AuthContext'
 import { Avatar } from '../components/ui/Avatar'
 import { EmptyState } from '../components/ui/EmptyState'
-import { getSkill } from '../lib/utils'
-import { UserPlus, Shield, Trash2, Clock, Copy, Check } from 'lucide-react'
+import { getSkill, SKILLS } from '../lib/utils'
+import { UserPlus, Shield, Trash2, Clock, Copy, Check, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 
 export default function TeamPage() {
-  const { currentOrg, members, isAdmin, inviteMember, shareOwnership, removeMember, revokeInvite, myRole, refetchMembers } = useOrg()
+  const { currentOrg, members, isAdmin, inviteMember, shareOwnership, removeMember, revokeInvite, updateMemberSkill, myRole } = useOrg()
   const { user } = useAuth()
   const [inviteEmail, setInviteEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
+  const [editingSkillId, setEditingSkillId] = useState(null)
 
   async function handleInvite() {
     if (!inviteEmail.trim()) return
@@ -29,11 +30,11 @@ export default function TeamPage() {
     const inviteLink = `${window.location.origin}/invite?token=${data.invite_token}`
     await copyToClipboard(inviteLink)
     if (resent) {
-      toast(`${inviteEmail} was already invited — link re-copied! Share it with them.`, { icon: '🔗', duration: 6000 })
+      toast(`${inviteEmail} was already invited — link re-copied!`, { icon: '🔗', duration: 6000 })
     } else if (userExists) {
-      toast.success(`${inviteEmail} has been invited and notified!`)
+      toast.success(`Invite sent! ${inviteEmail} will see it in their notifications.`)
     } else {
-      toast(`Invite link copied! Share it with ${inviteEmail} to join.`, { icon: '🔗', duration: 6000 })
+      toast(`${inviteEmail} isn't on Teamer yet — link copied! Send it to them to sign up and join.`, { icon: '🔗', duration: 8000 })
     }
     setInviteEmail('')
   }
@@ -54,7 +55,7 @@ export default function TeamPage() {
   }
 
   async function handleShareOwnership(memberId) {
-    if (!confirm('Give this person admin access?')) return
+    if (!confirm('Give this person admin access? They will be able to assign tasks.')) return
     await shareOwnership(memberId)
     toast.success('Admin access granted')
   }
@@ -69,6 +70,12 @@ export default function TeamPage() {
     if (!confirm('Revoke this invite?')) return
     await revokeInvite(memberId)
     toast.success('Invite revoked')
+  }
+
+  async function handleSkillChange(m, skill) {
+    setEditingSkillId(null)
+    await updateMemberSkill(m.user_id, skill)
+    toast.success('Role updated')
   }
 
   if (!currentOrg) return <EmptyState icon="👥" title="No workspace" description="Create a workspace to manage your team." />
@@ -102,7 +109,7 @@ export default function TeamPage() {
             </button>
           </div>
           <p className="text-xs mt-2" style={{ color: 'var(--text-3)' }}>
-            An invite link will be copied to your clipboard — share it via email, WhatsApp, Slack, or wherever.
+            If they're already on Teamer they'll get a notification. If not, an invite link is copied — send it to them.
           </p>
         </div>
       )}
@@ -122,10 +129,10 @@ export default function TeamPage() {
               const skill = getSkill(m.profiles?.skill)
               const isMe = m.user_id === user?.id
               return (
-                <div key={m.id} className="flex items-center gap-3 px-5 py-3 border-b last:border-0 transition-colors hover:opacity-90" style={{ borderColor: 'var(--border)' }}>
+                <div key={m.id} className="flex items-center gap-3 px-5 py-3 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
                   <Avatar name={m.profiles?.full_name || m.email} src={m.profiles?.avatar_url} size={36} />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium truncate">{m.profiles?.full_name || m.email}</p>
                       {isMe && <span className="badge text-xs" style={{ background: 'var(--surface-2)', color: 'var(--text-3)' }}>You</span>}
                       {m.role !== 'member' && (
@@ -134,19 +141,40 @@ export default function TeamPage() {
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <span className="text-xs" style={{ color: 'var(--text-3)' }}>{skill.icon} {skill.label}</span>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {/* Inline role editor for admins */}
+                      {isAdmin && !isMe && editingSkillId === m.id ? (
+                        <select
+                          autoFocus
+                          defaultValue={m.profiles?.skill || 'other'}
+                          onChange={e => handleSkillChange(m, e.target.value)}
+                          onBlur={() => setEditingSkillId(null)}
+                          style={{ padding: '1px 4px', fontSize: 11, height: 'auto', width: 'auto' }}
+                        >
+                          {SKILLS.map(s => <option key={s.value} value={s.value}>{s.icon} {s.label}</option>)}
+                        </select>
+                      ) : (
+                        <button
+                          className="text-xs flex items-center gap-1"
+                          style={{ color: 'var(--text-3)', background: 'none', border: 'none', padding: 0, cursor: isAdmin && !isMe ? 'pointer' : 'default' }}
+                          onClick={() => isAdmin && !isMe && setEditingSkillId(m.id)}
+                          title={isAdmin && !isMe ? 'Click to change role' : undefined}
+                        >
+                          {skill.icon} {skill.label}
+                          {isAdmin && !isMe && <ChevronDown size={10} />}
+                        </button>
+                      )}
                       <span className="text-xs" style={{ color: 'var(--text-3)' }}>{m.email}</span>
                     </div>
                   </div>
                   {isAdmin && !isMe && (
                     <div className="flex items-center gap-1">
                       {m.role === 'member' && myRole === 'owner' && (
-                        <button className="btn-ghost p-1.5 text-xs" title="Make admin" onClick={() => handleShareOwnership(m.id)}>
+                        <button className="btn-ghost p-1.5" title="Make admin (can assign tasks)" onClick={() => handleShareOwnership(m.id)}>
                           <Shield size={15} />
                         </button>
                       )}
-                      <button className="btn-ghost p-1.5" title="Remove" onClick={() => handleRemove(m.id)} style={{ color: '#ef4444' }}>
+                      <button className="btn-ghost p-1.5" title="Remove member" onClick={() => handleRemove(m.id)} style={{ color: '#ef4444' }}>
                         <Trash2 size={15} />
                       </button>
                     </div>
@@ -171,7 +199,10 @@ export default function TeamPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm truncate">{m.email}</p>
-                <p className="text-xs" style={{ color: 'var(--text-3)' }}>Invited {format(new Date(m.created_at), 'MMM d, yyyy')}</p>
+                <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+                  Invited {format(new Date(m.created_at), 'MMM d, yyyy')}
+                  {!m.user_id && <span className="ml-1" style={{ color: '#f59e0b' }}>· not on Teamer yet</span>}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>
