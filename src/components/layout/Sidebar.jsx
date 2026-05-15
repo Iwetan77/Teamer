@@ -1,9 +1,8 @@
-import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, CheckSquare, Users, Megaphone,
   Settings, ChevronDown, Plus, Sun, Moon, LogOut,
-  Bell, User, Building2, Menu, X
+  User, Building2
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useOrg } from '../../context/OrgContext'
@@ -18,14 +17,13 @@ const NAV_ITEMS = [
   { to: '/announcements', icon: Megaphone, label: 'Announcements' },
 ]
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen, setMobileOpen }) {
   const { profile, signOut } = useAuth()
   const { orgs, currentOrg, setCurrentOrg, isAdmin } = useOrg()
   const { dark, toggle } = useTheme()
   const location = useLocation()
   const [orgDropdown, setOrgDropdown] = useState(false)
   const [createOrgOpen, setCreateOrgOpen] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
 
   const sidebarContent = (
     <div className="flex flex-col h-full" style={{ background: 'var(--surface)' }}>
@@ -130,14 +128,6 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
-      <button
-        className="fixed top-4 left-4 z-50 p-2 rounded-lg lg:hidden card"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-      </button>
-
       {/* Mobile overlay */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setMobileOpen(false)} />
